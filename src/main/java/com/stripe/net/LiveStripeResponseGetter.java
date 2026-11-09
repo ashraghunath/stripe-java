@@ -2,7 +2,6 @@ package com.stripe.net;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonPrimitive;
 import com.google.gson.JsonSyntaxException;
 import com.stripe.Stripe;
 import com.stripe.exception.*;
@@ -353,11 +352,16 @@ public class LiveStripeResponseGetter implements StripeResponseGetter {
       this property to distinguish between OAuth and API errors.
       */
       JsonObject responseBody = ApiResource.GSON.fromJson(response.body(), JsonObject.class);
-      if (responseBody.has("error") && responseBody.get("error").isJsonPrimitive()) {
-        JsonPrimitive error = responseBody.getAsJsonPrimitive("error");
-        if (error.isString()) {
-          handleOAuthError(response);
-        }
+      JsonElement errorElement = responseBody.get("error");
+      if (errorElement != null
+          && errorElement.isJsonPrimitive()
+          && errorElement.getAsJsonPrimitive().isString()) {
+        handleOAuthError(response);
+      } else if (errorElement != null && !errorElement.isJsonObject()) {
+        // A non-object `error` cannot be deserialized into a StripeError; fail with the
+        // same malformed-response error used for other unexpected payloads instead of
+        // letting a Gson type exception escape.
+        throw makeMalformedJsonError(response.body(), response.code(), response.requestId(), null);
       } else if (apiMode == ApiMode.V2) {
         handleV2ApiError(response);
       } else {

@@ -133,6 +133,24 @@ public class LiveStripeResponseGetterTest extends BaseStripeTest {
   }
 
   @Test
+  public void testErrorWithNonObjectErrorField() throws StripeException {
+    HttpClient spy = Mockito.spy(new HttpURLConnectionClient());
+    StripeResponseGetter srg = new LiveStripeResponseGetter(spy);
+    ApiResource.setGlobalResponseGetter(srg);
+    StripeResponse response =
+        new StripeResponse(400, HttpHeaders.of(Collections.emptyMap()), "{\"error\": 123}");
+    Mockito.doReturn(response).when(spy).requestWithRetries(Mockito.<StripeRequest>any());
+    Exception exception =
+        assertThrows(
+            ApiException.class,
+            () -> {
+              Subscription.retrieve("sub_123");
+            });
+    assertThat(
+        exception.getMessage(), CoreMatchers.containsString("Invalid response object from API"));
+  }
+
+  @Test
   public void testIdempotencyError() throws StripeException {
     HttpClient spy = Mockito.spy(new HttpURLConnectionClient());
     StripeResponseGetter srg = new LiveStripeResponseGetter(spy);
